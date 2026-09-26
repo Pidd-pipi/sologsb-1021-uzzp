@@ -3,7 +3,10 @@ import type { DictionaryEntry, DuplicatePair } from '~/types/dictionary';
 export const normalizeWord = (value: string) => value
   .normalize('NFKC')
   .toLowerCase()
-  .replace(/[\s·.'’\-_()[\]{}，。！？、]/g, '');
+  .replace(/[\s·.'’\-_()[\]{}，。！？、；：:]/g, '');
+
+/** 合并重复词条时判断两条释义是否相同：归一化标点与空白后比较 */
+export const definitionKey = (value: string) => normalizeWord(value || '');
 
 const bigrams = (value: string) => {
   const text = normalizeWord(value);
@@ -27,13 +30,17 @@ export const similarity = (left: string, right: string) => {
   return (2 * hits) / (a.length + b.length);
 };
 
+/** 取一条词条全部义项的释义文本 */
+export const entryDefinitions = (entry: DictionaryEntry): string[] =>
+  entry.senses.map((sense) => sense.definition).filter((value) => value.trim());
+
 export const findDuplicates = (entries: DictionaryEntry[]): DuplicatePair[] => {
   const pairs: DuplicatePair[] = [];
   entries.forEach((left, index) => {
     entries.slice(index + 1).forEach((right) => {
       const headwordScore = similarity(left.headword, right.headword);
       const synonymScore = Math.max(0, ...left.synonyms.map((word) => similarity(word, right.headword)), ...right.synonyms.map((word) => similarity(word, left.headword)));
-      const meaningScore = similarity(left.definition, right.definition) * .35;
+      const meaningScore = Math.max(0, ...entryDefinitions(left).flatMap((lText) => entryDefinitions(right).map((rText) => similarity(lText, rText)))) * .35;
       const score = Math.max(headwordScore, synonymScore * .92, meaningScore);
       if (score < .62) return;
       const reasons: string[] = [];
@@ -51,7 +58,7 @@ export const referencesToEntry = (entries: DictionaryEntry[], target: Dictionary
   const names = new Set([target.headword, ...target.synonyms].map(normalizeWord));
   return entries.filter((entry) => entry.id !== target.id && (
     entry.synonyms.some((synonym) => names.has(normalizeWord(synonym)))
-    || entry.definition.includes(target.headword)
+    || entry.senses.some((sense) => sense.definition.includes(target.headword))
     || entry.examples.some((example) => names.has(normalizeWord(example.source)))
   ));
 };

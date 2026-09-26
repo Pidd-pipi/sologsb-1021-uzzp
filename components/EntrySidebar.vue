@@ -10,6 +10,15 @@ const statusMeta = {
   disputed: { label: '争议', theme: 'danger' },
   confirmed: { label: '已确认', theme: 'success' }
 } as const;
+
+const preview = (entry: { senses: Array<{ definition: string }> }) => {
+  const first = entry.senses.find((sense) => sense.definition.trim())?.definition;
+  return first || '尚未填写释义';
+};
+
+const openCommentCount = (entry: { reviewerComments: Array<{ status: string }>; senses: Array<{ reviewerComments: Array<{ status: string }> }> }) =>
+  entry.reviewerComments.filter((item) => item.status === 'open').length
+  + entry.senses.reduce((sum, sense) => sum + sense.reviewerComments.filter((item) => item.status === 'open').length, 0);
 </script>
 
 <template>
@@ -49,11 +58,13 @@ const statusMeta = {
           <t-tag size="small" variant="light" :theme="statusMeta[entry.status].theme">{{ statusMeta[entry.status].label }}</t-tag>
         </div>
         <div class="pronunciation">[{{ entry.pronunciation || '待补音' }}] · {{ entry.partOfSpeech || '词性待定' }}</div>
-        <p>{{ entry.definition || '尚未填写释义' }}</p>
+        <p :title="preview(entry)">{{ preview(entry) }}</p>
         <div class="entry-card-meta">
-          <span>{{ entry.dialectVariants.length }} 方言变体</span>
+          <span>{{ entry.senses.length }} 义项</span>
+          <span>{{ entry.senses.filter((sense) => sense.status === 'confirmed').length }} 已定稿</span>
+          <span>{{ entry.dialectVariants.length }} 方言</span>
           <span>{{ entry.examples.length }} 例句</span>
-          <span v-if="entry.reviewerComments.filter((item) => item.status === 'open').length" class="comment-count">{{ entry.reviewerComments.filter((item) => item.status === 'open').length }} 条意见</span>
+          <span v-if="openCommentCount(entry)" class="comment-count">{{ openCommentCount(entry) }} 条意见</span>
         </div>
       </button>
       <t-empty v-if="!store.filteredEntries.length" description="没有符合条件的词条" />

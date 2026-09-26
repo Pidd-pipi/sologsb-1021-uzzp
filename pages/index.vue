@@ -5,19 +5,26 @@ import EntryEditor from '~/components/EntryEditor.vue';
 import ReviewPanel from '~/components/ReviewPanel.vue';
 import DuplicateMergeDialog from '~/components/DuplicateMergeDialog.vue';
 import DeleteImpactDialog from '~/components/DeleteImpactDialog.vue';
+import PublishDialog from '~/components/PublishDialog.vue';
 import VersionDrawer from '~/components/VersionDrawer.vue';
 import { useDictionaryStore } from '~/store/dictionary';
 import { referencesToEntry } from '~/utils/dictionary';
-import type { DictionaryEntry } from '~/types/dictionary';
+import type { DictionaryEntry, ReleasePackage } from '~/types/dictionary';
 
 const store = useDictionaryStore();
 const duplicateOpen = ref(false);
 const versionsOpen = ref(false);
 const deleteOpen = ref(false);
+const publishOpen = ref(false);
 const deleteTarget = ref<DictionaryEntry | null>(null);
 const statusText = ref('本地数据已同步');
 
 const impacts = computed(() => deleteTarget.value ? referencesToEntry(store.entries, deleteTarget.value) : []);
+
+const flashStatus = (text: string, delay = 3200) => {
+  statusText.value = text;
+  window.setTimeout(() => { statusText.value = '本地数据已同步'; }, delay);
+};
 
 const openDelete = () => {
   deleteTarget.value = store.selectedEntry ?? null;
@@ -29,17 +36,23 @@ const confirmDelete = () => {
   const name = deleteTarget.value.headword;
   store.deleteEntry(deleteTarget.value.id);
   deleteOpen.value = false;
-  statusText.value = `已删除“${name}”，可在版本记录中恢复`;
-  window.setTimeout(() => { statusText.value = '本地数据已同步'; }, 3200);
+  flashStatus(`已删除“${name}”，可在版本记录中恢复`);
 };
 
 const openDuplicates = () => {
   if (!store.duplicates.length) {
-    statusText.value = '当前没有检测到高度相似的重复词条';
-    window.setTimeout(() => { statusText.value = '本地数据已同步'; }, 2600);
+    flashStatus('当前没有检测到高度相似的重复词条', 2600);
     return;
   }
   duplicateOpen.value = true;
+};
+
+const openPublish = () => {
+  publishOpen.value = true;
+};
+
+const onPublished = (payload: ReleasePackage) => {
+  flashStatus(`已公开发布 ${payload.entryCount} 个词条、${payload.senseCount} 个已确认义项，未定稿内容留在工作区`, 4200);
 };
 
 const exportData = () => {
@@ -76,6 +89,7 @@ const keyboard = (event: KeyboardEvent) => {
   if (event.key.toLowerCase() === 'k') { event.preventDefault(); moveEntry(-1); }
   if (event.key.toLowerCase() === 'd') { event.preventDefault(); openDuplicates(); }
   if (event.key.toLowerCase() === 'v') { event.preventDefault(); versionsOpen.value = true; }
+  if (event.key.toLowerCase() === 'p') { event.preventDefault(); openPublish(); }
 };
 
 onMounted(() => window.addEventListener('keydown', keyboard));
@@ -91,16 +105,19 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keyboard));
         <t-button variant="text" theme="default" :disabled="!store.canUndo" @click="store.undo">撤销</t-button>
         <t-button variant="text" theme="default" :disabled="!store.canRedo" @click="store.redo">重做</t-button>
         <t-button variant="outline" theme="default" @click="exportData">导出备份</t-button>
+        <t-button variant="outline" theme="default" @click="openPublish">公开发布</t-button>
         <t-button theme="primary" @click="store.createEntry">＋ 新建词条</t-button>
       </div>
     </header>
 
     <section class="project-bar">
-      <div><span class="eyebrow">COMMUNITY DICTIONARY · 离线工作区</span><h2>词汇整理与审校</h2><p>从田野记录到确认词条，逐字段保留修改依据、审校回复和版本历史。</p></div>
+      <div><span class="eyebrow">COMMUNITY DICTIONARY · 离线工作区</span><h2>词汇整理与义项审校</h2><p>审校与发布落在每个义项上：已确认义项随公开发布带出，未定稿内容留在工作区继续打磨。</p></div>
       <div class="project-stats">
         <div><strong>{{ store.entries.length }}</strong><span>词条</span></div>
+        <div><strong>{{ store.entries.reduce((sum, entry) => sum + entry.senses.length, 0) }}</strong><span>义项</span></div>
         <div><strong>{{ store.entries.filter((entry) => entry.status === 'review').length }}</strong><span>待审</span></div>
         <div><strong>{{ store.entries.filter((entry) => entry.status === 'disputed').length }}</strong><span>争议</span></div>
+        <div><strong>{{ store.confirmedSenses }}</strong><span>已确认义项</span></div>
         <div><strong>{{ store.openComments }}</strong><span>待回复意见</span></div>
         <div><strong>{{ store.duplicates.length }}</strong><span>疑似重复</span></div>
       </div>
@@ -113,10 +130,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keyboard));
     </main>
 
     <section class="bottom-bar">
-      <div class="method-card"><span class="method-index">01</span><div><strong>字段级审校</strong><p>审校意见绑定到词形、发音、释义、例句或来源，编辑可逐条回复并解决。</p></div></div>
-      <div class="method-card"><span class="method-index">02</span><div><strong>引用影响检查</strong><p>删除词条前扫描同义词、释义和例句引用，列出可能受影响的全部词条。</p></div></div>
+      <div class="method-card"><span class="method-index">01</span><div><strong>义项级审校</strong><p>释义、状态、审校意见都落在义项上；编辑改动只让该义项退回待审，其余义项不受影响。</p></div></div>
+      <div class="method-card"><span class="method-index">02</span><div><strong>义项级公开发布</strong><p>发布包只包含已确认义项；草稿、待审、争议内容留在工作区，最后一条定稿被移除时整条退回待审。</p></div></div>
       <div class="method-card"><span class="method-index">03</span><div><strong>离线版本保护</strong><p>所有编辑在浏览器本地保存；撤销重做与版本恢复均保留提交前完整快照。</p></div></div>
-      <div class="keyboard-card"><kbd>J/K</kbd><span>切换词条</span><kbd>/</kbd><span>搜索</span><kbd>D</kbd><span>查重</span><kbd>V</kbd><span>版本</span></div>
+      <div class="keyboard-card"><kbd>J/K</kbd><span>切换词条</span><kbd>/</kbd><span>搜索</span><kbd>D</kbd><span>查重</span><kbd>V</kbd><span>版本</span><kbd>P</kbd><span>发布</span></div>
     </section>
 
     <footer class="footer-bar">
@@ -127,6 +144,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', keyboard));
     <ClientOnly>
       <DuplicateMergeDialog v-model="duplicateOpen" :pairs="store.duplicates" />
       <DeleteImpactDialog v-model="deleteOpen" :entry="deleteTarget" :impacts="impacts" @confirm="confirmDelete" />
+      <PublishDialog v-model="publishOpen" @published="onPublished" />
       <VersionDrawer v-model="versionsOpen" />
     </ClientOnly>
   </div>

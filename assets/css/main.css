@@ -121,6 +121,37 @@ button, input, textarea { font: inherit; }
 kbd { padding: 3px 6px; border: 1px solid #cbd6d1; border-bottom-width: 2px; border-radius: 5px; background: #f0f3f1; font-family: ui-monospace, monospace; font-size: 8px; }
 .footer-bar { display: flex; justify-content: space-between; align-items: center; padding: 13px 21px 0; color: #71817b; font-size: 9px; }
 .delete-link { border: 0; color: var(--danger); background: transparent; font-size: 9px; text-decoration: underline; }
+.status-reason { margin: 8px 14px 0; }
+.sense-summary { color: var(--muted); font-size: 9px; }
+.senses-title { margin-top: 18px; }
+.sense-card { padding-top: 9px; }
+.sense-head { display: flex; align-items: center; gap: 8px; padding-right: 22px; }
+.sense-actions { display: flex; gap: 5px; margin-left: auto; }
+.sense-definition { margin-top: 8px; }
+.sense-opinion { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.opinion-chip { padding: 5px 8px; border-radius: 6px; background: #fdf3e7; color: #8a5a24; font-size: 9px; }
+.opinion-chip.resolved { background: #edf6f0; color: #3d7a5c; }
+.sense-merge-preview { margin-top: 13px; }
+.merge-sense-list { max-height: 180px; overflow-y: auto; border: 1px solid #dbe3df; border-radius: 8px; }
+.merge-sense-item { display: flex; align-items: center; gap: 8px; padding: 7px 10px; background: white; font-size: 10px; }
+.merge-sense-item + .merge-sense-item { border-top: 1px solid #e6ece9; }
+.merge-sense-item.duplicate { background: #fdf6ec; color: #9a7b4f; text-decoration: line-through; }
+.merge-sense-item.duplicate span { text-decoration: line-through; }
+.merge-sense-item.source { background: #f2f7fb; }
+.publish-dialog { display: flex; flex-direction: column; gap: 11px; }
+.publish-dialog h3 { margin: 4px 0 0; font-family: "Songti SC", serif; font-size: 14px; }
+.publish-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.publish-stats div { padding: 10px; text-align: center; border-radius: 8px; background: #f0f4f1; }
+.publish-stats strong { display: block; font-family: "Songti SC", serif; font-size: 21px; color: var(--forest); }
+.publish-stats span { color: var(--muted); font-size: 9px; }
+.publish-list, .withheld-list { max-height: 190px; overflow-y: auto; border: 1px solid #e0e7e3; border-radius: 8px; }
+.publish-list article, .withheld-list article { display: flex; align-items: baseline; gap: 8px; padding: 8px 10px; font-size: 10px; }
+.publish-list article + article, .withheld-list article + article { border-top: 1px solid #e9efec; }
+.publish-list article { flex-direction: column; align-items: stretch; gap: 3px; }
+.publish-list strong, .withheld-list strong { font-size: 11px; }
+.publish-sense { color: #3d7a5c; font-size: 9px; }
+.withheld-list span { color: var(--muted); }
+.withheld-note { margin: 0; color: #8a5a24; font-size: 9px; }
 .merge-content { padding-bottom: 4px; }
 .merge-toolbar { gap: 10px; color: var(--muted); font-size: 10px; }
 .pair-navigation { gap: 6px; margin-right: auto; }
