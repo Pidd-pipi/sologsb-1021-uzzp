@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useDictionaryStore } from '~/store/dictionary';
+import { countOpenComments, senseText } from '~/utils/dictionary';
 
 const store = useDictionaryStore();
 const emit = defineEmits<{ create: []; duplicates: []; versions: [] }>();
@@ -49,11 +50,11 @@ const statusMeta = {
           <t-tag size="small" variant="light" :theme="statusMeta[entry.status].theme">{{ statusMeta[entry.status].label }}</t-tag>
         </div>
         <div class="pronunciation">[{{ entry.pronunciation || '待补音' }}] · {{ entry.partOfSpeech || '词性待定' }}</div>
-        <p>{{ entry.definition || '尚未填写释义' }}</p>
+        <p>{{ senseText(entry) || '尚未填写释义' }}</p>
         <div class="entry-card-meta">
-          <span>{{ entry.dialectVariants.length }} 方言变体</span>
+          <span>{{ entry.senses.length }} 义项（{{ entry.senses.filter((item) => item.status === 'confirmed').length }} 已确认）</span>
           <span>{{ entry.examples.length }} 例句</span>
-          <span v-if="entry.reviewerComments.filter((item) => item.status === 'open').length" class="comment-count">{{ entry.reviewerComments.filter((item) => item.status === 'open').length }} 条意见</span>
+          <span v-if="countOpenComments(entry)" class="comment-count">{{ countOpenComments(entry) }} 条意见</span>
         </div>
       </button>
       <t-empty v-if="!store.filteredEntries.length" description="没有符合条件的词条" />

@@ -1,17 +1,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { useDictionaryStore } from '~/store/dictionary';
+import type { EntryStatus } from '~/types/dictionary';
 
 const store = useDictionaryStore();
 const activeTab = ref('basic');
 const entry = computed(() => store.selectedEntry);
 const synonymsText = computed(() => entry.value?.synonyms.join('、') ?? '');
 
+const statusMeta: Record<EntryStatus, { label: string; theme: 'default' | 'warning' | 'danger' | 'success' }> = {
+  draft: { label: '草稿', theme: 'default' },
+  review: { label: '待审', theme: 'warning' },
+  disputed: { label: '争议', theme: 'danger' },
+  confirmed: { label: '已确认', theme: 'success' }
+};
+
 const eventValue = (event: any) => typeof event === 'string' || typeof event === 'number' ? String(event) : event?.target?.value ?? event?.e?.target?.value ?? event?.value ?? '';
 
-const commitInput = (event: any, field: 'headword' | 'pronunciation' | 'partOfSpeech' | 'definition' | 'notes') => {
+const commitInput = (event: any, field: 'headword' | 'pronunciation' | 'partOfSpeech' | 'notes') => {
   if (!entry.value) return;
   store.updateField(entry.value.id, field, eventValue(event), field);
+};
+
+const commitSense = (event: any, senseId: string) => {
+  if (!entry.value) return;
+  store.updateSenseDefinition(entry.value.id, senseId, eventValue(event));
 };
 </script>
 
@@ -23,11 +36,11 @@ const commitInput = (event: any, field: 'headword' | 'pronunciation' | 'partOfSp
         <div class="lexeme-line"><h2>{{ entry.headword || '未命名词条' }}</h2><span>[{{ entry.pronunciation || '音标待补' }}]</span></div>
       </div>
       <div class="editor-actions">
-        <t-tag :theme="entry.status === 'confirmed' ? 'success' : entry.status === 'disputed' ? 'danger' : entry.status === 'review' ? 'warning' : 'default'" variant="light">{{ entry.status }}</t-tag>
-        <t-button size="small" variant="outline" @click="store.setStatus(entry.id, 'review')">提交待审</t-button>
-        <t-button size="small" theme="success" @click="store.setStatus(entry.id, 'confirmed')">确认词条</t-button>
+        <t-tag :theme="statusMeta[entry.status].theme" variant="light">{{ statusMeta[entry.status].label }}</t-tag>
+        <span class="sense-count">{{ entry.senses.filter((item) => item.status === 'confirmed').length }} / {{ entry.senses.length }} 义项已确认</span>
       </div>
     </div>
+    <t-alert v-if="entry.statusReason" class="status-reason" theme="warning" :title="entry.statusReason" />
 
     <t-tabs v-model="activeTab" class="entry-tabs">
       <t-tab-panel value="basic" label="核心信息">
@@ -37,12 +50,32 @@ const commitInput = (event: any, field: 'headword' | 'pronunciation' | 'partOfSp
             <label class="field-block"><span>发音说明</span><t-input :default-value="entry.pronunciation" @blur="commitInput($event, 'pronunciation')" placeholder="声调、重音或发音人说明" /></label>
           </div>
           <div class="field-grid two compact-grid">
-            <label class="field-block"><span>词性</span><t-select :model-value="entry.partOfSpeech" @change="(value) => store.updateField(entry.id, 'partOfSpeech', String(value || ''))" clearable>
+            <label class="field-block"><span>词性</span><t-select :model-value="entry.partOfSpeech" @change="(value: any) => store.updateField(entry.id, 'partOfSpeech', String(value || ''))" clearable>
               <t-option value="名词" label="名词" /><t-option value="动词" label="动词" /><t-option value="形容词" label="形容词" /><t-option value="副词" label="副词" /><t-option value="方向词" label="方向词" /><t-option value="量词" label="量词" /><t-option value="短语" label="短语" />
             </t-select></label>
-            <label class="field-block"><span>同义词（用顿号分隔）</span><t-input :default-value="synonymsText" @blur="store.setSynonyms(entry.id, eventValue($event).split(/[、,，]/).map((item) => item.trim()).filter(Boolean))" placeholder="水潭、泉眼" /></label>
+            <label class="field-block"><span>同义词（用顿号分隔）</span><t-input :default-value="synonymsText" @blur="store.setSynonyms(entry.id, eventValue($event).split(/[、,，]/).map((item: string) => item.trim()).filter(Boolean))" placeholder="水潭、泉眼" /></label>
           </div>
-          <label class="field-block"><span>释义</span><t-textarea :default-value="entry.definition" :autosize="{ minRows: 3, maxRows: 7 }" @blur="commitInput($event, 'definition')" placeholder="用简洁语言描述词义、语用限制和引申关系" /></label>
+
+          <div class="section-title sense-title">
+            <div><h3>义项</h3><p>审校与发布以义项为粒度：修改释义只让该义项回到待审，已确认义项可单独进入公开发布。</p></div>
+            <t-button size="small" @click="store.addSense(entry.id)">＋ 添加义项</t-button>
+          </div>
+          <div v-for="(item, index) in entry.senses" :key="item.id" class="subcard sense-card">
+            <button class="remove-button" title="移除义项" @click="store.removeSense(entry.id, item.id)">×</button>
+            <div class="sense-card-head">
+              <span class="card-index">义项 {{ String(index + 1).padStart(2, '0') }}</span>
+              <t-tag size="small" variant="light" :theme="statusMeta[item.status].theme">{{ statusMeta[item.status].label }}</t-tag>
+              <span v-if="item.comments.filter((comment) => comment.status === 'open').length" class="sense-comment-count">{{ item.comments.filter((comment) => comment.status === 'open').length }} 条待回复意见</span>
+            </div>
+            <t-textarea :default-value="item.definition" :autosize="{ minRows: 2, maxRows: 5 }" placeholder="用简洁语言描述词义、语用限制和引申关系" @blur="commitSense($event, item.id)" />
+            <div class="sense-actions">
+              <t-button size="small" variant="outline" :disabled="item.status === 'review'" @click="store.setSenseStatus(entry.id, item.id, 'review')">提交待审</t-button>
+              <t-button size="small" variant="outline" theme="danger" :disabled="item.status === 'disputed'" @click="store.setSenseStatus(entry.id, item.id, 'disputed')">标记争议</t-button>
+              <t-button size="small" theme="success" :disabled="item.status === 'confirmed'" @click="store.setSenseStatus(entry.id, item.id, 'confirmed')">确认义项</t-button>
+            </div>
+          </div>
+          <t-empty v-if="!entry.senses.length" description="尚未添加义项" />
+
           <label class="field-block"><span>编者备注</span><t-textarea :default-value="entry.notes" :autosize="{ minRows: 2, maxRows: 5 }" @blur="commitInput($event, 'notes')" placeholder="记录不确定项、调查问题或整理说明" /></label>
         </div>
       </t-tab-panel>
